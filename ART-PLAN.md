@@ -95,7 +95,7 @@ Recraft 4.1 $0.035 · Soul Standard ~$0.094. הערכה: 3 אפשרויות ≈ 
 **שלב 1 (0001–0003, בנוי):** `profiles`, `studios`, `studio_members` (role + 4 הרשאות, ציירת אחת לסטודיו),
 `invites`, `app_admins`, `app_config`, `rate_limits`. RLS: ברירת מחדל חסום + `mfa_gate` מגביל (0002).
 
-**שלב 2 (הבא):**
+**שלב 2 (0004–0007, בנוי — פירוט ב-DECISIONS 13–16):**
 | טבלה | תוכן |
 |---|---|
 | `images` | `kind: web / upload / generated`, `owner_id`, `storage_path`, `parent_id` (מקור→גרסה), `generation_id`, `shared`, `seen_at`. לתמונה מהרשת: `provider, provider_id, page_url, thumb_url, creator, creator_url, source_name, license, license_url, attribution`. **CHECK**: לתמונה שנוצרה אין קרדיט או מקור; לתמונה מהרשת חובה `page_url` + `attribution` |
@@ -113,7 +113,7 @@ Storage: bucket פרטי `images`, נתיב `{studio}/{owner}/{uuid}.webp`. הע
 ## 8. העברת תמונות מהטלפון
 1. העלאה מספריית התמונות / קבצים (כולם).
 2. אנדרואיד: Web Share Target ב-manifest (POST → service worker → העלאה).
-3. אייפון: ספארי לא תומך ב-Share Target ל-PWA (לאמת על מכשיר). חלופה: וואטסאפ → שמירה לתמונות →
+3. אייפון: ספארי לא תומך ב-Share Target ל-PWA (אומת בתיעוד 28.09.2026, DECISIONS 17). חלופה: וואטסאפ → שמירה לתמונות →
    "העלאה מהתמונות"; וגם "הדבקת קישור" ששומר קישור בלבד (בלי לגרד את התמונה מהאתר).
 
 ## 9. שלבים
