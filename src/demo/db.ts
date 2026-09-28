@@ -11,8 +11,10 @@ type Owner = "mom" | "fam" | "omer";
 export const PEOPLE: Record<Owner, string> = { mom: "אמא", fam: "מיכל", omer: "עומר" };
 
 interface Img {
-  id: string; kind: "web" | "upload"; path: string | null; thumb: string | null; width: number; height: number;
+  id: string; kind: "web" | "upload" | "generated"; path: string | null; thumb: string | null; width: number; height: number;
   shared: boolean; owner: Owner; created_at: string; deleted_at: string | null;
+  /** a pretend-generated version keeps a link to the picture it came from (like the real design) */
+  parent?: string;
   web?: { page_url: string; creator: string; source_name: string; license: string; license_url: string; attribution: string };
 }
 interface Coll { id: string; name: string; is_default: boolean; shared: boolean }
@@ -156,7 +158,7 @@ export class DemoDb {
             const r = who === "mom" ? this.react.get(i.id) : undefined;
             return {
               id: i.id, kind: i.kind, storage_path: i.path, width: i.width, height: i.height, shared: i.shared,
-              family_can_see: this.isShared(i), parent_id: null, by_me: i.owner === who, owner_name: this.ownerName(i.owner),
+              family_can_see: this.isShared(i), parent_id: i.parent && this.img(i.parent) ? i.parent : null, by_me: i.owner === who, owner_name: this.ownerName(i.owner),
               page_url: i.web?.page_url ?? null, thumb_url: i.thumb, creator: i.web?.creator ?? null, creator_url: null,
               source_name: i.web?.source_name ?? null, license: i.web?.license ?? null, license_url: i.web?.license_url ?? null,
               attribution: i.web?.attribution ?? null, source_status: null, created_at: i.created_at,
@@ -296,6 +298,18 @@ export class DemoDb {
         this.addItem(this.target(a.p_collection), i.id);
         return i.id;
       }
+      case "add_generated": {
+        // the pretend "new version" the demo's create screen saves: private, in her main collection, linked to its source
+        this.mom(who);
+        const src = this.img(a.p_parent);
+        if (!src || src.deleted_at) this.err("not_found", "P0002");
+        if (!this.hasFile(a.p_path)) this.err("upload_missing");
+        const i: Img = { id: this.id("u"), kind: "generated", path: a.p_path, thumb: null, width: a.p_width || src!.width, height: a.p_height || src!.height,
+          shared: false, owner: "mom", created_at: this.now().toISOString(), deleted_at: null, parent: src!.id };
+        this.imgs.push(i);
+        this.addItem(this.defaultColl().id, i.id);
+        return i.id;
+      }
       case "send_suggestion": {
         if (who !== "fam") this.err("not_allowed", "42501");
         if (!this.hasFile(a.p_path)) this.err("upload_missing");
@@ -332,7 +346,7 @@ export class DemoDb {
     const i = this.img(imageId)!;
     if (i.kind === "web") { i.deleted_at = this.now().toISOString(); i.shared = false; return "hidden"; }
     const s = this.sugOf(i.id);
-    this.gone.push({ id: this.id("g"), origin: s ? "suggestion" : "upload", sender: s ? s.sender : null, uploaded_at: i.created_at, deleted_at: this.now().toISOString() });
+    this.gone.push({ id: this.id("g"), origin: i.kind === "generated" ? "generated" : s ? "suggestion" : "upload", sender: s ? s.sender : null, uploaded_at: i.created_at, deleted_at: this.now().toISOString() });
     if (s) { s.status = "deleted"; s.image_id = null; s.message = null; }
     this.items = this.items.filter((x) => x.img !== i.id);
     this.cmts = this.cmts.filter((c) => c.image_id !== i.id);

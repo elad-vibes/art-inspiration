@@ -30,6 +30,16 @@ Vite + TypeScript (בלי framework) · Supabase: Postgres + RLS, Auth (קוד �
 Storage, Edge Functions (Deno) · GitHub Pages. אפיון: `ART-PLAN.md` · החלטות: `DECISIONS.md` ·
 הקמה: `SETUP.md` · כללי עבודה: `AGENTS.md` · נכסים ורישיונות: `ASSETS.md`.
 
+## גרסת הדגמה
+קישור ציבורי להראות לאחרים, בלי כניסה ובלי חיבור לשום שרת: מסכי אמא והמשפחה על נתונים בדויים בזיכרון,
+פס קבוע "גרסת הדגמה – שום דבר לא נשמר", ופעולות שמתאפסות ברענון. כולל יצירת גרסה חדשה **מדומה**
+(3 אפשרויות צבע, מסומנות "לא נוצר באמת"). אין בה Supabase, מפתחות, קוד רשת או אחסון בדפדפן, והבדיקה
+`npm run check:demo` מוודאת זאת. נפרסת אוטומטית מהענף `claude/demo`.
+```bash
+npm run dev:demo       # http://localhost:5174/art-inspiration/
+npm run build:demo && npm run check:demo
+```
+
 ## פיתוח
 ```bash
 npm install

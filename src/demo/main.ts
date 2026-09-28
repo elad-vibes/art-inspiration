@@ -12,12 +12,14 @@ import { renderHome } from "../ui/home.ts";
 import { markArt } from "../ui/art.ts";
 import { PEOPLE, type Who } from "./db.ts";
 import { demo } from "./runtime.ts";
+import { GEN, genSheet, injectGenButton } from "./gen.ts";
 
 const FAMILY = { can_send: true, can_view: true, can_comment: true, can_generate: false };
 const ALL = { can_send: true, can_view: true, can_comment: true, can_generate: true };
 
 function setWho(who: Who) {
   demo.who = who;
+  GEN.cur = null;                      // an open "create" screen belongs to the person who opened it
   const mom = who === "mom";
   S.myName = PEOPLE[who];
   S.painterName = PEOPLE.mom;
@@ -41,7 +43,8 @@ function view(): SafeHtml {
     <header class="top">
       <div class="brand">${markArt()}<div><small>השראה לציור</small><h1>הסטודיו של אמא</h1></div></div>
     </header>
-    <main class="wrap">${renderHome()}</main>`;
+    <main class="wrap">${renderHome()}</main>
+    ${genSheet()}`;
 }
 
 // keep what someone typed in a text box while the screen redraws (same idea as the real app)
@@ -69,6 +72,7 @@ function renderAll() {
   const snap = snapshot();
   render(root, html`${view()}${S.flash ? html`<div class="flash banner ${S.flash.kind}" role="status">${S.flash.text}</div>` : ""}`);
   restore(snap);
+  injectGenButton();
 }
 
 installEvents();

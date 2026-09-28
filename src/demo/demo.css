@@ -9,5 +9,18 @@ body.demo{padding-top:calc(env(safe-area-inset-top,0px) + var(--demo-h) + 12px)}
 .demo-bar .seg button{min-height:40px;padding:4px 22px;background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4)}
 .demo-bar .seg button[aria-checked="true"]{background:#fff;color:#7A3B20;border-color:#fff}
 .tabs{top:calc(env(safe-area-inset-top,0px) + var(--demo-h) + 6px)}
+/* the pretend "create a new version" screen */
+.sheet.gen{overflow-y:auto}
+.gen h2{display:flex;align-items:center;gap:8px}
+.gen-src{width:100%;max-height:34vh;object-fit:contain;border-radius:14px;background:var(--surface2)}
+.gen .chips{flex-wrap:wrap;overflow:visible}
+.gen-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.gen-opt{display:flex;flex-direction:column;gap:6px;padding:6px;min-height:0;height:auto;align-items:stretch;font-size:14px;line-height:1.25}
+.gen-opt img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block}
+.gen-opt[aria-pressed="true"]{border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep)}
+.sheet.viewer > button.primary{background:var(--accent-deep);color:#fff;border:1px solid var(--accent-deep)}
+@media (prefers-color-scheme:dark){.sheet.viewer > button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}}
+.sheet.viewer > button.primary .lu{color:currentColor}
+.demo-tag{font-size:13px;font-weight:700;background:rgba(255,255,255,.22);border-radius:999px;padding:1px 8px}
 /* bottom sheets must not slide under the bar */
 .sheet,.sheet.viewer{max-height:calc(100dvh - var(--demo-h) - env(safe-area-inset-top,0px) - 10px)}
