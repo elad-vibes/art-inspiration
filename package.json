@@ -14,7 +14,10 @@
     "icons": "node scripts/icons.mjs",
     "lucide": "node scripts/lucide.mjs",
     "prepare": "git config core.hooksPath tools-git || true",
-    "scan": "node scripts/precommit-scan.mjs --all"
+    "scan": "node scripts/precommit-scan.mjs --all",
+    "dev:demo": "vite --mode demo",
+    "build:demo": "tsc --noEmit -p tsconfig.json && vite build --mode demo",
+    "check:demo": "node scripts/check-demo.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

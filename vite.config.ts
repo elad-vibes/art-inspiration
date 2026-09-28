@@ -8,7 +8,45 @@ const ROOT = fileURLToPath(new URL(".", import.meta.url));
 // Served from GitHub Pages at /art-inspiration/ (DECISIONS 12).
 const BASE = "/art-inspiration/";
 
+// --mode demo: a separate build of the same screens over an in-memory database (src/demo/).
+// It never reads .env files, has no Supabase client, key or service worker, and its CSP
+// forbids every network connection. The real build below is unchanged.
+const DEMO_ROOT = fileURLToPath(new URL("./src/demo/", import.meta.url));
+const DEMO_SUPA = fileURLToPath(new URL("./src/demo/supa.ts", import.meta.url));
+const DEMO_DATA = fileURLToPath(new URL("./src/demo/data.ts", import.meta.url));
+const DEMO_OUT = fileURLToPath(new URL("./dist-demo/", import.meta.url));
+
 export default defineConfig(({ mode }) => {
+  if (mode === "demo") {
+    const csp = [
+      "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:",
+      "font-src 'self'", "connect-src 'none'", "worker-src 'none'", "manifest-src 'none'", "base-uri 'none'",
+      "form-action 'none'", "object-src 'none'", "frame-src 'none'", "upgrade-insecure-requests",
+    ].join("; ");
+    return {
+      root: DEMO_ROOT,
+      base: BASE,
+      envDir: false,
+      publicDir: false,
+      define: { "import.meta.env.VITE_SUPABASE_URL": '""', "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": '""' },
+      // the app's own data layer imports lib/supa.ts (and data.ts); in the demo those names mean src/demo/*
+      resolve: { alias: [
+        { find: /^(\.\.?\/)+lib\/supa\.ts$/, replacement: DEMO_SUPA },
+        { find: /^(\.\.?\/)+data\.ts$/, replacement: DEMO_DATA },
+      ] },
+      plugins: [{
+        name: "inject-demo-csp",
+        apply: "build",
+        transformIndexHtml: (html: string) => html.replace("<!--CSP-->", `<meta http-equiv="Content-Security-Policy" content="${csp}">`),
+      }],
+      // no modulepreload polyfill: it is the only place a build makes a fetch() of its own
+      build: { outDir: DEMO_OUT, emptyOutDir: true, target: "es2022", sourcemap: false, modulePreload: { polyfill: false },
+        rolldownOptions: { output: { comments: { legal: true } } } },
+      server: { port: 5174, strictPort: true, fs: { allow: [ROOT] } },
+      preview: { port: 4174, strictPort: true },
+    };
+  }
+
   const env = loadEnv(mode, ROOT, "");
   // Only the URL and the PUBLISHABLE key may reach the browser bundle.
   const url = env.VITE_SUPABASE_URL || env.SUPABASE_URL || "";
