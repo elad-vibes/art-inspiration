@@ -6,6 +6,8 @@ import { NAMES } from "../fixtures/synthetic.ts";
 export const STUDIO = "11111111-1111-4111-8111-111111111111";
 export const USER = "22222222-2222-4222-8222-222222222222";
 export const ORIGIN = "https://elad-vibes.github.io";
+export const CRON_SECRET = "cron-secret-for-tests-only-0123456789";
+export const IMAGE = "33333333-3333-4333-8333-333333333333";
 
 export interface FakeState {
   access: Record<string, unknown> | null;
@@ -15,6 +17,16 @@ export interface FakeState {
   invite: any;
   claim: any;
   admin: string[];
+  /** What delete_image returns for the caller (a path, or null = a hidden web picture). */
+  deleteResult: string | null;
+  /** Makes userRpc fail with this database message (e.g. "not_found"). */
+  userError: string | null;
+  /** Storage removal fails (all paths). */
+  storageFails: boolean;
+  /** Paths the cleanup queue hands out. */
+  batch: string[];
+  storageCalls: string[][];
+  userCalls: { token: string; fn: string; args: any }[];
 }
 
 export function makeDeps(over: Partial<FakeState> = {}) {
@@ -26,6 +38,12 @@ export function makeDeps(over: Partial<FakeState> = {}) {
     invite: { ok: true, studio_name: NAMES.studioA, role: "family", person_name: NAMES.daughter, can_send: true, can_view: true, can_comment: false, can_generate: false },
     claim: { ok: true },
     admin: [],
+    deleteResult: null,
+    userError: null,
+    storageFails: false,
+    batch: [],
+    storageCalls: [],
+    userCalls: [],
     ...over,
   };
 
@@ -41,6 +59,7 @@ export function makeDeps(over: Partial<FakeState> = {}) {
       case "svc_rate_limit": return s.rateOk;
       case "svc_invite_info": return s.invite;
       case "svc_claim_invite": return s.claim;
+      case "svc_cleanup_batch": return s.batch;
       default: return null;
     }
   };
@@ -50,9 +69,21 @@ export function makeDeps(over: Partial<FakeState> = {}) {
       allowedOrigins: [ORIGIN, "http://localhost:5173"],
       requireOrigin: true,
       appUrl: "https://elad-vibes.github.io/painting-inspiration/",
+      cronSecret: CRON_SECRET,
     },
     verifyJwt: async (t) => tokens[t] ?? null,
     rpc,
+    userRpc: async (token, fn, args) => {
+      s.userCalls.push({ token, fn, args });
+      if (s.userError) throw Object.assign(new Error("user rpc failed"), { code: "P0002", pgMessage: s.userError });
+      return s.deleteResult as any;
+    },
+    storage: {
+      remove: async (paths) => {
+        s.storageCalls.push(paths);
+        if (s.storageFails) throw new Error("storage_remove_failed");
+      },
+    },
     admin: {
       createUser: async (email) => { s.admin.push(`create:${email}`); return "created"; },
     },

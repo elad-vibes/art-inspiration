@@ -2,15 +2,18 @@
 // Reads run under RLS (gallery / inbox / collections_list are SECURITY INVOKER);
 // writes are the checked server functions of 0006. Files live in the private
 // bucket "images" and are shown through short-lived signed URLs.
-import { dbMessage, sb } from "./lib/supa.ts";
+import { dbMessage, invoke, sb } from "./lib/supa.ts";
 import { encodePhoto } from "./lib/photo.ts";
 import { can, isPainter, rerender, S } from "./state.ts";
 import {
-  cleanText, type CollectionRow, type CommentRow, type GalleryImage, type InboxItem, looksLikeImage,
-  MAX_COMMENT, MAX_MESSAGE, MAX_NOTE, type MySuggestion, type Rating, uploadPath,
+  cleanText, type CollectionRow, type CommentRow, type DeletedRow, type DeleteResult, type GalleryImage, type InboxItem,
+  looksLikeImage, MAX_COMMENT, MAX_MESSAGE, MAX_NOTE, type MySuggestion, type Rating, uploadPath,
 } from "./domain/images.ts";
 
-export type Tab = "gallery" | "inbox" | "collections";
+export type Tab = "gallery" | "inbox" | "collections" | "deleted";
+
+/** The delete confirmation on screen: which picture, and (for the box) which suggestion. */
+export interface PendingDelete { image: string; suggestion: string | null; busy: boolean }
 
 const BUCKET = "images";
 const URL_TTL = 3600;              // seconds a signed URL lives
@@ -24,6 +27,8 @@ export const G = {
   inbox: null as InboxItem[] | null,
   collections: null as CollectionRow[] | null,
   mine: null as MySuggestion[] | null,
+  deleted: null as DeletedRow[] | null,             // the painter's "deleted" screen
+  confirm: null as PendingDelete | null,
   newCount: 0,
   err: null as string | null,
   online: typeof navigator === "undefined" ? true : navigator.onLine,
@@ -40,8 +45,8 @@ export const G = {
 function reset(sid: string | null) {
   if (G.draft) URL.revokeObjectURL(G.draft.preview);
   Object.assign(G, {
-    sid, tab: "gallery", filter: null, images: null, inbox: null, collections: null, mine: null, newCount: 0,
-    err: null, open: null, memberOf: {}, comments: {}, busy: null, draft: null, editColl: null,
+    sid, tab: "gallery", filter: null, images: null, inbox: null, collections: null, mine: null, deleted: null,
+    confirm: null, newCount: 0, err: null, open: null, memberOf: {}, comments: {}, busy: null, draft: null, editColl: null,
   });
   G.urls.clear();
 }
@@ -49,6 +54,7 @@ function reset(sid: string | null) {
 /** Hebrew message for any failure here (photo decoding, Storage, database, network). */
 export function errMsg(e: any): string {
   if (e && ["decode", "too_big", "not_image", "offline"].includes(e.code)) return e.message;
+  if (e && e.extra !== undefined && e.message) return e.message;   // an Edge Function already answered in Hebrew (invoke)
   const m = String(e?.message ?? "");
   if (/exceeded the maximum|too large|payload/i.test(m) || String(e?.statusCode) === "413") return "התמונה גדולה מדי. אפשר לנסות תמונה אחרת.";
   if (/mime type/i.test(m)) return "אפשר להעלות רק תמונות.";
@@ -99,6 +105,10 @@ export async function loadMine() {
   await sign(rows.map((r) => r.storage_path));
   G.mine = rows;
 }
+/** The painter's "deleted" list. No picture is ever signed here: only hidden web pictures have a (hotlinked) thumbnail. */
+export async function loadDeleted() {
+  G.deleted = await rpc<DeletedRow[]>("deleted_list", { p_studio: G.sid });
+}
 
 /** Everything this person may see in the current studio. */
 export async function loadAll() {
@@ -141,7 +151,7 @@ async function putPhoto(file: File): Promise<{ path: string; width: number; heig
   return { path, width: enc.width, height: enc.height };
 }
 
-/** Removes files nobody uses any more (after a delete, or a send that failed). Best effort. */
+/** Removes a file we just uploaded when registering it failed (a delete never comes through here: the server does it). Best effort. */
 export async function removeFiles(paths: (string | null | undefined)[]) {
   const list = paths.filter((p): p is string => !!p);
   if (!list.length) return;
@@ -199,10 +209,9 @@ export async function sendSuggestion(file: File, message: string) {
 }
 
 // ------------------------------------------------------- the painter's box
-export async function decide(id: string, action: "accept" | "ignore" | "delete", collection: string | null = null) {
+export async function decide(id: string, action: "accept" | "ignore", collection: string | null = null) {
   needNet();
-  const path = await rpc<string | null>("decide_suggestion", { p_suggestion: id, p_action: action, p_collection: collection });
-  if (action === "delete") await removeFiles([path]);
+  await rpc<string | null>("decide_suggestion", { p_suggestion: id, p_action: action, p_collection: collection });
   await Promise.all(action === "accept" ? [loadInbox(), loadGallery(), loadCollections()] : [loadInbox()]);
 }
 
@@ -248,12 +257,41 @@ export async function toggleCollection(id: string, collection: string, on: boole
   await Promise.all([loadMembership(id), loadCollections(), loadGallery()]);
 }
 
-export async function deleteImage(id: string) {
-  needNet();
-  const path = await rpc<string | null>("delete_image", { p_image: id });
-  await removeFiles([path]);
+// ------------------------------------------------------------------ deleting
+// One server function does it all (permission check, database, file). A web picture is
+// only hidden; anything else is deleted for real. The screen refreshes what changed.
+async function refreshAfterDelete() {
   G.open = null;
-  await Promise.all([loadGallery(), loadCollections()]);
+  G.confirm = null;
+  const jobs: Promise<unknown>[] = [loadGallery(), loadCollections()];
+  if (isPainter()) jobs.push(loadInbox());
+  if (G.deleted !== null) jobs.push(loadDeleted());
+  await Promise.all(jobs);
+}
+
+/** Deletes (or hides) a picture through the server. `suggestion` is only used to know what the box should refresh. */
+export async function deletePicture(image: string): Promise<DeleteResult> {
+  needNet();
+  const r = await invoke<DeleteResult>("delete-image", { image_id: image });
+  await refreshAfterDelete();
+  return r;
+}
+
+export async function restoreImage(id: string) {
+  needNet();
+  await rpc("restore_image", { p_image: id });
+  await Promise.all([loadDeleted(), loadGallery(), loadCollections()]);
+}
+
+/** The confirmation before any delete: what the picture is decides what the screen promises. */
+export function askDelete(image: string, suggestion: string | null = null) {
+  G.confirm = { image, suggestion, busy: false };
+  rerender();
+}
+export function cancelDelete() {
+  if (G.confirm?.busy) return;
+  G.confirm = null;
+  rerender();
 }
 
 // -------------------------------------------------------------- collections

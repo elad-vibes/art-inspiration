@@ -3,3 +3,9 @@ project_id = "painting-inspiration"
 
 [functions.invite-signin]
 verify_jwt = false  # public endpoint (the invite token is the credential); JWTs are verified inside functions
+
+[functions.delete-image]
+verify_jwt = false  # the caller's token is verified inside (guard.caller) and then used to call delete_image as them
+
+[functions.storage-cleanup]
+verify_jwt = false  # called by the scheduler, not by a user: the x-cron-secret header is the credential

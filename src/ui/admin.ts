@@ -6,6 +6,7 @@ import { armed2, isArmed, on } from "../lib/events.ts";
 import { appUrl, dbMessage, sb } from "../lib/supa.ts";
 import { S, flash, rerender } from "../state.ts";
 import { normalize, PERM_LABEL, PERMS, type Perms, PRESETS, presetOf, presetPerms, type PresetId, type Role } from "../domain/perms.ts";
+import { type AdminIndexRow, countLabel, deletedLabel, fmtBytes, type StorageOverviewRow } from "../domain/images.ts";
 import { banner, copyText, fmtDate, shareLink } from "./common.ts";
 import { icon } from "./icons.ts";
 
@@ -18,20 +19,23 @@ interface AdminState {
   open: string | null;                    // studio being managed
   members: MemberRow[];
   invites: InviteRow[];
+  storage: StorageOverviewRow[];          // numbers only (0008) — never a picture, note or file name
+  index: AdminIndexRow[];                 // the deleted-pictures index of the open studio: kind, sender, dates
   draft: { role: Role; perms: Perms; name: string };
   link: { url: string; who: string } | null;
   err?: string;
 }
 const X = () => (S.extra.admin ??= {
-  studios: null, open: null, members: [], invites: [],
+  studios: null, open: null, members: [], invites: [], storage: [], index: [],
   draft: { role: "family", perms: presetPerms("sender"), name: "" }, link: null,
 }) as AdminState;
 
 export async function loadAdmin() {
   const x = X();
-  const { data, error } = await sb.rpc("admin_studios");
+  const [{ data, error }, st] = await Promise.all([sb.rpc("admin_studios"), sb.rpc("admin_storage_overview")]);
   if (error) { x.err = dbMessage(error); rerender(); return; }
   x.studios = data ?? [];
+  x.storage = st.error ? [] : (st.data ?? []);
   x.err = undefined;
   if (!x.open && x.studios!.length === 1) x.open = x.studios![0].id;
   if (x.open) await loadStudio(x.open); else rerender();
@@ -39,10 +43,13 @@ export async function loadAdmin() {
 
 async function loadStudio(id: string) {
   const x = X();
-  const [m, i] = await Promise.all([sb.rpc("admin_members", { p_studio: id }), sb.rpc("admin_invites", { p_studio: id })]);
+  const [m, i, d] = await Promise.all([
+    sb.rpc("admin_members", { p_studio: id }), sb.rpc("admin_invites", { p_studio: id }), sb.rpc("admin_deleted_index", { p_studio: id }),
+  ]);
   if (m.error || i.error) { flash(dbMessage(m.error ?? i.error), "err"); return; }
   x.members = m.data ?? [];
   x.invites = i.data ?? [];
+  x.index = d.error ? [] : (d.data ?? []);
   rerender();
 }
 
@@ -66,7 +73,33 @@ export function renderAdmin(): SafeHtml {
       <form class="row nowrap" data-submit="adm-create"><input type="text" id="admName" maxlength="60" required placeholder="שם הסטודיו, למשל: הסטודיו של אמא"><button class="primary" type="submit">יצירה</button></form>
     </div>
     ${open ? renderStudio(open) : ""}
+    ${renderStorage()}
+    ${open ? renderIndex(open) : ""}
     <div class="card muted-card"><h2>שימוש ותקרות יצירה</h2><p class="muted">יתווסף בשלב 7: תקרה חודשית, מספר בקשות, שימוש והוצאה משוערת. עד אז היצירה כבויה.</p></div>`;
+}
+
+/** Per studio: how many pictures and roughly how much space. Numbers only. */
+function renderStorage(): SafeHtml {
+  const rows = X().storage;
+  if (!rows.length) return html``;
+  return html`<div class="card"><h2>${icon("hard-drive")} אחסון</h2>
+    <p class="muted small">מספרים בלבד: כמה תמונות ומה הנפח המשוער. אין מכאן גישה לתמונות, לשמות קבצים או להערות.</p>
+    ${rows.map((r) => html`<div class="storage-row"><b>${r.name}</b>
+      <small>${countLabel(r.image_count)} · ${r.file_count} קבצים · בערך <bdi dir="ltr">${fmtBytes(r.bytes_est)}</bdi>${r.files_no_size ? ` (ל-${r.files_no_size} קבצים אין גודל ידוע)` : ""}</small>
+      <small>${r.deleted_count ? `${r.deleted_count} נמחקו לגמרי` : "עוד לא נמחקו תמונות"}</small>
+      ${r.cleanup_pending ? html`<small><span class="chip accent">${r.cleanup_pending} קבצים ממתינים לניקוי</span> יוסרו אוטומטית בניסיון הבא</small>` : ""}</div>`)}
+  </div>`;
+}
+
+/** The deleted-pictures index of the open studio: kind, sender and dates — nothing else exists to show. */
+function renderIndex(s: StudioRow): SafeHtml {
+  const rows = X().index;
+  return html`<div class="card"><h2>אינדקס מחיקות — ${s.name}</h2>
+    <p class="muted small">רק סוג, שולח ותאריכים. התמונה עצמה, הערות ודירוגים נמחקו ואי אפשר לשחזר אותם.</p>
+    ${rows.length ? rows.map((r) => html`<div class="idx-row"><b>${deletedLabel(r.origin, r.sender_name || null)}</b>
+      <small>הועלתה ב-${fmtDate(r.uploaded_at)} · נמחקה ב-${fmtDate(r.deleted_at)}</small></div>`)
+      : html`<p class="muted">עוד לא נמחקו תמונות בסטודיו הזה.</p>`}
+  </div>`;
 }
 
 function renderStudio(s: StudioRow): SafeHtml {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  cleanText, countLabel, creditParts, fitSize, looksLikeImage, MAX_SIDE, senderStatusLabel, uploadPath,
+  cleanText, countLabel, creditParts, deletedLabel, deletePrompt, fitSize, fmtBytes, looksLikeImage, MAX_SIDE,
+  senderStatusLabel, uploadPath,
 } from "../../src/domain/images.ts";
 
 describe("photo size", () => {
@@ -52,6 +53,49 @@ describe("credit under a web image", () => {
   it("an upload or a generated image never gets a credit or a source (AGENTS 7)", () => {
     expect(creditParts({ kind: "upload", creator: "x", source_name: "y", license: "z" })).toBeNull();
     expect(creditParts({ kind: "generated", creator: "x", source_name: "y", license: "z" })).toBeNull();
+  });
+});
+
+describe("what the delete confirmation promises", () => {
+  it("a web picture: it is only hidden and can be brought back, and her note is kept", () => {
+    const p = deletePrompt({ kind: "web" });
+    expect(p.final).toBe(false);
+    expect(p.body).toMatch(/נמחקו/);
+    expect(p.body).toMatch(/להחזיר/);
+    expect(p.body).not.toMatch(/אי אפשר לשחזר/);
+    expect(deletePrompt({ kind: "web", shared: true }).body).toMatch(/תיעלם גם מהמשפחה/);
+    expect(p.body).not.toMatch(/תיעלם גם מהמשפחה/);
+  });
+  it("anything else: deleted for good — says it can't be undone and what goes with it", () => {
+    for (const kind of ["upload", "generated"] as const) {
+      const p = deletePrompt({ kind });
+      expect(p.final).toBe(true);
+      expect(p.title).toMatch(/לגמרי/);
+      expect(p.body).toMatch(/אי אפשר לשחזר/);
+      expect(p.body).toMatch(/הערה/);
+      expect(p.confirm).toBe("מחיקה לגמרי");
+    }
+  });
+  it("a family picture also says the sender will see it was removed", () => {
+    expect(deletePrompt({ kind: "upload", sender: "מיכל" }).body).toMatch(/מיכל יראה שההצעה הוסרה/);
+    expect(deletePrompt({ kind: "upload" }).body).not.toMatch(/יראה שההצעה/);
+  });
+});
+
+describe("the 'deleted' screen", () => {
+  it("names each kind in Hebrew", () => {
+    expect(deletedLabel("web")).toBe("תמונה מהרשת");
+    expect(deletedLabel("upload")).toBe("תמונה שהעלית");
+    expect(deletedLabel("generated")).toBe("תמונה שנוצרה");
+    expect(deletedLabel("suggestion", "עומר")).toBe("הצעה מעומר");
+    expect(deletedLabel("suggestion")).toBe("הצעה מהמשפחה");
+  });
+  it("formats the admin's estimated size", () => {
+    expect([fmtBytes(0), fmtBytes(null), fmtBytes("abc")]).toEqual(["0", "0", "0"]);
+    expect(fmtBytes(100)).toBe("1 KB");
+    expect(fmtBytes(480 * 1024)).toBe("480 KB");
+    expect(fmtBytes("3355443")).toBe("3.2 MB");                                  // bigint arrives as a string sometimes
+    expect(fmtBytes(2.5 * 1024 ** 3)).toBe("2.50 GB");
   });
 });
 

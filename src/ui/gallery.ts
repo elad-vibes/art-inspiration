@@ -6,13 +6,13 @@ import { attr, html, safeUrl, type SafeHtml, $ } from "../lib/html.ts";
 import { armed2, isArmed, on } from "../lib/events.ts";
 import { can, flash, isPainter, rerender, S } from "../state.ts";
 import {
-  addComment, decide, deleteCollection, deleteComment, deleteImage, errMsg, G, loadAll, loadComments,
-  loadGallery, loadMembership, markSeen, renameCollection, saveNote, sendSuggestion, setRating, setShared,
-  shareCollection, createCollection, toggleCollection, type Tab, uploadMine, urlOf,
+  addComment, askDelete, cancelDelete, decide, deleteCollection, deleteComment, deletePicture, errMsg, G, loadAll,
+  loadComments, loadDeleted, loadGallery, loadMembership, markSeen, renameCollection, restoreImage, saveNote,
+  sendSuggestion, setRating, setShared, shareCollection, createCollection, toggleCollection, type Tab, uploadMine, urlOf,
 } from "../images.ts";
 import {
-  countLabel, creditParts, type GalleryImage, type InboxItem, MAX_COLLECTION_NAME, MAX_COMMENT, MAX_MESSAGE,
-  MAX_NOTE, senderStatusLabel,
+  countLabel, creditParts, type DeletedRow, deletedLabel, deletePrompt, type GalleryImage, type InboxItem,
+  MAX_COLLECTION_NAME, MAX_COMMENT, MAX_MESSAGE, MAX_NOTE, senderStatusLabel,
 } from "../domain/images.ts";
 import { banner, fmtDate } from "./common.ts";
 import { art } from "./art.ts";
@@ -80,14 +80,14 @@ function filterChips(): SafeHtml | "" {
 
 // ================================================================ painter
 export function renderPainter(): SafeHtml {
-  const tabs: [Tab, string][] = [["gallery", "הגלריה"], ["inbox", "הצעות"], ["collections", "אוספים"]];
+  const tabs: [Tab, string][] = [["gallery", "הגלריה"], ["inbox", "הצעות"], ["collections", "אוספים"], ["deleted", "נמחקו"]];
   return html`<div class="tabs" role="tablist" aria-label="מסכים">
       ${tabs.map(([t, label]) => html`<button role="tab" aria-selected="${G.tab === t}" data-click="g-tab" data-tab="${t}">${label}
         ${t === "inbox" && G.newCount ? html`<span class="count" aria-label="${G.newCount} חדשות">${G.newCount}</span>` : ""}</button>`)}
     </div>
     ${netBanner()}
-    ${G.tab === "inbox" ? renderInbox() : G.tab === "collections" ? renderCollections() : renderGallery()}
-    ${renderSheet()}`;
+    ${G.tab === "inbox" ? renderInbox() : G.tab === "collections" ? renderCollections() : G.tab === "deleted" ? renderDeleted() : renderGallery()}
+    ${renderSheet()}${renderConfirm()}`;
 }
 
 function renderGallery(): SafeHtml {
@@ -114,7 +114,6 @@ function renderGallery(): SafeHtml {
 // ------------------------------------------------------- suggestion box
 function suggestionCard(s: InboxItem): SafeHtml {
   const src = urlOf(s.storage_path);
-  const del = `g-sdel/${s.id}`;
   const cols = G.collections ?? [];
   return html`<article class="card sugg">
     <div class="sugg-h"><b>מ${s.sender_name}</b> <span class="muted small">${fmtDate(s.created_at)}</span>
@@ -126,7 +125,7 @@ function suggestionCard(s: InboxItem): SafeHtml {
     <div class="row">
       <button class="primary" data-click="g-accept" data-id="${s.id}" ${attr(!G.online, "disabled")}>${icon("check")} לשמור</button>
       ${s.status === "pending" ? html`<button data-click="g-ignore" data-id="${s.id}" ${attr(!G.online, "disabled")}>להתעלם</button>` : ""}
-      <button class="ghost danger ${isArmed(del) ? "armed" : ""}" data-click="g-sdelete" data-id="${s.id}" ${attr(!G.online, "disabled")}>${icon("trash-2")} ${isArmed(del) ? "למחוק לגמרי?" : "מחיקה"}</button>
+      <button class="ghost danger" data-click="g-sdelete" data-id="${s.id}" ${attr(!G.online, "disabled")}>${icon("trash-2")} מחיקה</button>
     </div>
   </article>`;
 }
@@ -195,7 +194,6 @@ function renderSheet(): SafeHtml | "" {
   const painter = isPainter();
   const src = i.kind === "web" ? safeUrl(i.thumb_url ?? "") : urlOf(i.storage_path);
   const member = G.memberOf[i.id];
-  const del = `g-idel/${i.id}`;
   const parent = i.parent_id ? G.images?.find((x) => x.id === i.parent_id) : null;
   const byline = i.kind === "generated" ? "תמונה שנוצרה" : painter && !i.by_me && i.owner_name ? `מ${i.owner_name}` : "";
   return html`<div class="sheet-bg" data-click="g-close"></div>
@@ -221,8 +219,65 @@ function renderSheet(): SafeHtml | "" {
           <p class="muted small">${!i.shared && i.family_can_see ? "התמונה כבר משותפת דרך אוסף משותף. " : ""}רק מי שקיבל הרשאת צפייה יראה אותה.</p></section>
       ` : ""}
       ${commentsBlock(i)}
-      ${painter ? html`<button class="ghost danger ${isArmed(del) ? "armed" : ""}" data-click="g-idelete" data-id="${i.id}" ${attr(!G.online, "disabled")}>${icon("trash-2")} ${isArmed(del) ? "למחוק את התמונה מכל מקום?" : "מחיקת התמונה"}</button>` : ""}
+      ${painter ? html`<button class="ghost danger" data-click="g-idelete" data-id="${i.id}" ${attr(!G.online, "disabled")}>${icon("trash-2")} ${i.kind === "web" ? "הסרת התמונה מהגלריה" : "מחיקת התמונה"}</button>` : ""}
     </div>`;
+}
+
+// ---------------------------------------------------------- delete confirmation
+/** What the confirmation must say depends on what is being deleted (hide vs. delete for real). */
+function confirmPrompt() {
+  const c = G.confirm!;
+  const gi = G.images?.find((x) => x.id === c.image);
+  if (gi) return deletePrompt({ kind: gi.kind, shared: gi.family_can_see, sender: !gi.by_me ? gi.owner_name : null });
+  const s = G.inbox?.find((x) => x.image_id === c.image);
+  return deletePrompt({ kind: "upload", sender: s?.sender_name ?? null });
+}
+
+function renderConfirm(): SafeHtml | "" {
+  const c = G.confirm;
+  if (!c) return "";
+  const p = confirmPrompt();
+  return html`<div class="sheet-bg cf-bg" data-click="g-confirm-no"></div>
+    <div class="sheet confirm" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle" aria-describedby="cfBody">
+      <h2 id="cfTitle">${p.title}</h2>
+      <p id="cfBody">${p.body}</p>
+      <div class="col">
+        <button class="${p.final ? "solid-danger" : "primary"} big" data-click="g-confirm-yes" ${attr(c.busy || !G.online, "disabled")}>${c.busy ? html`<span class="spin"></span>` : icon(p.final ? "trash-2" : "check")} ${p.confirm}</button>
+        <button class="big" data-click="g-confirm-no" ${attr(c.busy, "disabled")}>ביטול</button>
+      </div>
+    </div>`;
+}
+
+// ------------------------------------------------------------ "deleted" screen
+function deletedRow(d: DeletedRow): SafeHtml {
+  const label = deletedLabel(d.origin, d.sender_name);
+  if (d.restorable) {
+    const thumb = safeUrl(d.thumb_url ?? "");
+    const page = safeUrl(d.page_url ?? "");
+    return html`<article class="card del-row">
+      <div class="del-pic">${thumb !== "#" ? html`<img src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : html`<span class="ph">${icon("images")}</span>`}</div>
+      <div class="del-txt"><b>${label}</b>
+        <small>${(d.creator ?? "").trim() || "יוצר לא ידוע"}${d.source_name ? ` · ${d.source_name}` : ""}${page !== "#" ? html` · <a href="${page}" target="_blank" rel="noopener noreferrer">מקור</a>` : ""}</small>
+        <small>הוסרה ב-${fmtDate(d.deleted_at)}</small></div>
+      <button class="primary" data-click="g-restore" data-id="${d.id}" ${attr(!G.online, "disabled")}>${icon("undo-2")} שחזור</button>
+    </article>`;
+  }
+  return html`<article class="card del-row gone">
+    <div class="del-pic"><span class="ph">${icon("file-x")}</span></div>
+    <div class="del-txt"><b>${label}</b>
+      <small>הועלתה ב-${fmtDate(d.uploaded_at)} · נמחקה ב-${fmtDate(d.deleted_at)}</small>
+      <small class="final">התמונה נמחקה ולא ניתן לשחזר.</small></div>
+  </article>`;
+}
+
+function renderDeleted(): SafeHtml {
+  const list = G.deleted;
+  return html`<div class="card"><h2>${icon("trash-2")} נמחקו</h2>
+      <p class="small">תמונה מהרשת רק מוסתרת כאן, ואפשר להחזיר אותה בלחיצה.
+        תמונה שהעלית, הצעה מהמשפחה או תמונה שנוצרה נמחקו לגמרי, ולא ניתן לשחזר אותן. נשארת רק שורה קטנה עם התאריך.</p></div>
+    ${list === null ? (G.err ? "" : html`<div class="skel"><div class="skel-card"><div class="skel-line" style="width:50%"></div><div class="skel-line"></div></div></div>`)
+      : list.length ? list.map(deletedRow)
+      : html`<div class="card empty">${art.easel()}<h2>אין תמונות שנמחקו</h2><p class="muted">כשתמחקי או תסירי תמונה, היא תופיע כאן.</p></div>`}`;
 }
 
 // ================================================================= family
@@ -292,6 +347,10 @@ on("click", "g-tab", async (el) => {
   rerender();
   window.scrollTo({ top: 0 });
   if (G.tab === "inbox") { await markSeen(); rerender(); }
+  if (G.tab === "deleted") {
+    try { await loadDeleted(); } catch (e) { flash(errMsg(e), "err"); }
+    rerender();
+  }
 });
 on("click", "g-filter", (el) => run(async () => { G.filter = el.dataset.id || null; G.images = null; rerender(); await loadGallery(); }));
 on("click", "g-show-coll", (el) => run(async () => { G.filter = el.dataset.id!; G.tab = "gallery"; G.images = null; rerender(); await loadGallery(); }));
@@ -316,8 +375,8 @@ on("click", "g-accept", (el) => {
 });
 on("click", "g-ignore", (el) => run(() => decide(el.dataset.id!, "ignore"), "ההצעה הועברה ל'הצעות שהתעלמת מהן'"));
 on("click", "g-sdelete", (el) => {
-  if (!armed2(`g-sdel/${el.dataset.id}`, rerender)) return;
-  return run(() => decide(el.dataset.id!, "delete"), "ההצעה נמחקה");
+  const s = G.inbox?.find((x) => x.id === el.dataset.id);
+  if (s) askDelete(s.image_id, s.id);           // the confirmation says what will happen; the server deletes
 });
 
 // one image
@@ -333,7 +392,11 @@ on("click", "g-open", async (el) => {
   rerender();
 });
 on("click", "g-close", () => { G.open = null; rerender(); });
-addEventListener("keydown", (e) => { if (e.key === "Escape" && G.open) { G.open = null; rerender(); } });
+addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (G.confirm) cancelDelete();
+  else if (G.open) { G.open = null; rerender(); }
+});
 on("click", "g-rate", (el) => run(() => setRating(el.dataset.id!, el.dataset.rating as "like" | "not_suitable")));
 on("submit", "g-note", (el) => run(() => saveNote(el.dataset.id!, $<HTMLTextAreaElement>("gNote")?.value ?? ""), "✓ ההערה נשמרה"));
 on("change", "g-share", (el) => {
@@ -341,10 +404,23 @@ on("change", "g-share", (el) => {
   return run(() => setShared(el.dataset.id!, shared), shared ? "✓ משותפת עם המשפחה" : "✓ התמונה פרטית שוב");
 });
 on("change", "g-in-coll", (el) => run(() => toggleCollection(el.dataset.id!, el.dataset.coll!, (el as HTMLInputElement).checked)));
-on("click", "g-idelete", (el) => {
-  if (!armed2(`g-idel/${el.dataset.id}`, rerender)) return;
-  return run(() => deleteImage(el.dataset.id!), "התמונה נמחקה");
+on("click", "g-idelete", (el) => askDelete(el.dataset.id!));
+on("click", "g-confirm-no", () => cancelDelete());
+on("click", "g-confirm-yes", async () => {
+  const c = G.confirm;
+  if (!c || c.busy) return;
+  c.busy = true;
+  rerender();
+  try {
+    const r = await deletePicture(c.image);
+    flash(r.mode === "hidden" ? "✓ התמונה הוסרה. אפשר להחזיר אותה ממסך \"נמחקו\"" : "✓ התמונה נמחקה לגמרי", "ok");
+  } catch (e) {
+    if (G.confirm) G.confirm.busy = false;
+    flash(errMsg(e), "err");
+  }
+  rerender();
 });
+on("click", "g-restore", (el) => run(() => restoreImage(el.dataset.id!), "✓ התמונה חזרה לגלריה"));
 on("submit", "g-comment", (el) => run(async () => {
   const t = $<HTMLTextAreaElement>("gComment");
   await addComment(el.dataset.id!, t?.value ?? "");

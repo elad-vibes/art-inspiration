@@ -277,7 +277,7 @@ describe("suggestions: seen by the sender and the painter only", () => {
     expect(await db.fails(as.painter, `select public.decide_suggestion($1, 'delete')`, [s1.sid])).toMatch(/already_decided/);
   });
 
-  it("delete: the image row goes, the sender sees 'deleted', and only the painter can then remove the file", async () => {
+  it("delete: the image row goes, the sender sees 'deleted', and the file is left to the server's cleanup queue", async () => {
     const s2 = await suggest(as.sender, null);
     const p = (await one(as.painter, `select public.decide_suggestion($1, 'delete') as p`, [s2.sid])).p;
     expect(p).toBe(s2.path);
@@ -285,11 +285,14 @@ describe("suggestions: seen by the sender and the painter only", () => {
     expect(await db.sql(`select status, image_id from public.suggestions where id = $1`, [s2.sid])).toEqual([{ status: "deleted", image_id: null }]);
     expect(await one(as.sender, `select status, storage_path from public.my_suggestions($1) where id = $2`, [S.A, s2.sid]))
       .toEqual({ status: "deleted", storage_path: null });
-    for (const a of [as.viewer, sender2, as.painterB, as.outsider, as.admin]) {
+    // queued for removal: nobody reads it or removes it from the app any more — only the server does (0008)
+    for (const a of [as.painter, as.sender, as.viewer, sender2, as.painterB, as.outsider, as.admin]) {
       expect(await canReadFile(a, p), `read as ${a.uid}`).toBe(false);
       expect((await db.as(a, `delete from storage.objects where name = $1`, [p])).affected, `remove as ${a.uid}`).toBe(0);
     }
-    expect((await db.as(as.painter, `delete from storage.objects where name = $1`, [p])).affected).toBe(1);
+    expect(await db.sql(`select path from public.storage_cleanup where path = $1`, [p])).toHaveLength(1);
+    await db.sql(`delete from storage.objects where name = $1`, [p]);
+    await db.sql(`delete from public.storage_cleanup where path = $1`, [p]);
   });
 
   it("a file an image still uses can't be removed by anyone — not even its uploader or the painter", async () => {
@@ -489,7 +492,9 @@ describe("delete_image cleans everything that hangs on it", () => {
       expect(await db.sql(`select 1 from public.${t} where image_id = $1`, [s.img]), t).toHaveLength(0);
     }
     expect((await db.sql(`select status from public.suggestions where id = $1`, [s.sid]))[0].status).toBe("deleted");
-    expect((await db.as(as.painter, `delete from storage.objects where name = $1`, [s.path])).affected).toBe(1);
+    expect(await db.sql(`select path from public.storage_cleanup where path = $1`, [s.path])).toHaveLength(1);
+    await db.sql(`delete from storage.objects where name = $1`, [s.path]);
+    await db.sql(`delete from public.storage_cleanup where path = $1`, [s.path]);
   });
 });
 
@@ -558,12 +563,13 @@ describe("fail closed", () => {
     expect(await callable("anon")).toEqual([]);
     expect(await callable("authenticated")).toEqual([
       "accept_invite", "add_comment", "add_upload", "admin_create_invite", "admin_create_studio", "admin_delete_studio",
-      "admin_invites", "admin_members", "admin_remove_member", "admin_rename_studio", "admin_revoke_invite",
-      "admin_set_member", "admin_studios", "am_i_admin", "can_read_object", "can_remove_object", "can_upload_object",
+      "admin_deleted_index", "admin_invites", "admin_members", "admin_remove_member", "admin_rename_studio",
+      "admin_revoke_invite", "admin_set_member", "admin_storage_overview", "admin_studios", "am_i_admin",
+      "can_read_object", "can_remove_object", "can_upload_object",
       "can_view_image", "collections_list", "create_collection", "decide_suggestion", "delete_collection",
-      "delete_comment", "delete_image", "gallery", "has_perm", "image_comments", "inbox", "is_image_shared",
+      "delete_comment", "delete_image", "deleted_list", "gallery", "has_perm", "image_comments", "inbox", "is_image_shared",
       "is_member", "is_painter", "is_super_admin", "jwt_aal", "local_month", "mark_suggestions_seen", "mfa_ok",
-      "my_suggestions", "remove_from_collection", "rename_collection", "save_to_collection", "save_web_image",
+      "my_suggestions", "remove_from_collection", "rename_collection", "restore_image", "save_to_collection", "save_web_image",
       "send_suggestion", "set_collection_shared", "set_image_shared", "set_reaction", "try_uuid",
     ].sort());
   });

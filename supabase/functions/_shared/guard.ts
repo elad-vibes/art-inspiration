@@ -5,11 +5,15 @@ import { HttpError } from "./http.ts";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (s: unknown): s is string => typeof s === "string" && UUID.test(s);
 
-export async function caller(req: Request, deps: Deps): Promise<Claims> {
-  const auth = req.headers.get("authorization") ?? "";
-  const m = /^Bearer\s+(.+)$/i.exec(auth);
+/** The access token from the Authorization header, or a 401. */
+export function bearerToken(req: Request): string {
+  const m = /^Bearer\s+(.+)$/i.exec(req.headers.get("authorization") ?? "");
   if (!m) throw new HttpError(401, "no_session", "צריך להתחבר מחדש.");
-  const claims = await deps.verifyJwt(m[1].trim());
+  return m[1].trim();
+}
+
+export async function caller(req: Request, deps: Deps): Promise<Claims> {
+  const claims = await deps.verifyJwt(bearerToken(req));
   if (!claims || !isUuid(claims.sub) || (claims.role && claims.role !== "authenticated")) {
     throw new HttpError(401, "bad_session", "צריך להתחבר מחדש.");
   }
