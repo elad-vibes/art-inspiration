@@ -1,0 +1,5 @@
+# Supabase project settings for "השראה לציור" (a separate project — DECISIONS 1).
+project_id = "painting-inspiration"
+
+[functions.invite-signin]
+verify_jwt = false  # public endpoint (the invite token is the credential); JWTs are verified inside functions
