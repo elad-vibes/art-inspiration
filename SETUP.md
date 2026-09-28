@@ -1,0 +1,27 @@
+# SETUP — הקמה (מה אלעד עושה, ומתי)
+
+עד שלב הפריסה אין צורך בכלום: הכול נבנה ונבדק מקומית (PGlite, תלויות מדומות).
+כשמגיעים לפריסה, Claude יכין לכל צעד הוראה מדויקת עם קופסה להעתקה. זו רק רשימת המשימות.
+
+## 1. GitHub (פעם אחת)
+- ריפו **ציבורי** חדש בשם `painting-inspiration` בחשבון `elad-vibes` (GitHub Pages חינמי רק לריפו ציבורי;
+  בריפו אין נתונים ואין מפתחות — AGENTS.md).
+- Settings → Pages → Source: **GitHub Actions**.
+- Settings → Variables (לא Secrets): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` — ערכים ציבוריים.
+
+## 2. Supabase — פרויקט חדש ונפרד (פעם אחת)
+- פרויקט חדש (אזור קרוב לישראל, למשל Frankfurt). **לא** הפרויקט של "הכסף של הבית".
+  בתוכנית החינמית אפשר 2 פרויקטים פעילים — לבדוק שיש מקום.
+- Auth: הרשמה כבויה · קוד במייל (OTP) · TOTP מופעל · SMS כבוי · SMTP (אפשר אותו חשבון Brevo).
+- מילוי `.env.local` לפי `.env.example` (מקומי בלבד, לא בצ'אט).
+- הרצת המיגרציות (`supabase/migrations/0001–0003`), פריסת `invite-signin`,
+  והוספת החשבון של אלעד ל-`app_admins`.
+
+## 3. אחר כך (שלבים מאוחרים — לא עכשיו)
+- `ANTHROPIC_API_KEY` — מפתח **חדש ונפרד** עם תקרת הוצאה בקונסולה של Anthropic (שלב 3).
+- `HF_API_KEY_ID` / `HF_API_KEY_SECRET` — Higgsfield, **רק בשלב 8 ובאישור אלעד**. עד אז `HIGGSFIELD_MODE=off`.
+- `PEXELS_API_KEY` — אופציונלי.
+כל המפתחות האלה נכנסים רק ל-Supabase secrets (`supabase secrets set ...`), אף פעם לא לדפדפן או לגיט.
+
+## איפוס אימות דו-שלבי לאדמין שאיבד טלפון
+לוח הבקרה של Supabase → Authentication → Users → המשתמש → Factors → מחיקה. בכניסה הבאה מגדירים מחדש.
