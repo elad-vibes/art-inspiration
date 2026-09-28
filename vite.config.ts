@@ -40,7 +40,8 @@ export default defineConfig(({ mode }) => {
         transformIndexHtml: (html: string) => html.replace("<!--CSP-->", `<meta http-equiv="Content-Security-Policy" content="${csp}">`),
       }],
       // no modulepreload polyfill: it is the only place a build makes a fetch() of its own
-      build: { outDir: DEMO_OUT, emptyOutDir: true, target: "es2022", sourcemap: false, modulePreload: { polyfill: false },
+      // assetsInlineLimit 0: a "web" picture's thumbnail must stay a real https file, never a data: URL
+      build: { outDir: DEMO_OUT, emptyOutDir: true, target: "es2022", sourcemap: false, modulePreload: { polyfill: false }, assetsInlineLimit: 0,
         rolldownOptions: { output: { comments: { legal: true } } } },
       server: { port: 5174, strictPort: true, fs: { allow: [ROOT] } },
       preview: { port: 4174, strictPort: true },
