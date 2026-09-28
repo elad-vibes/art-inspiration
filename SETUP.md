@@ -4,7 +4,7 @@
 כשמגיעים לפריסה, Claude יכין לכל צעד הוראה מדויקת עם קופסה להעתקה. זו רק רשימת המשימות.
 
 ## 1. GitHub (פעם אחת)
-- ריפו **ציבורי** חדש בשם `painting-inspiration` בחשבון `elad-vibes` (GitHub Pages חינמי רק לריפו ציבורי;
+- ריפו **ציבורי** חדש בשם `art-inspiration` בחשבון `elad-vibes` (GitHub Pages חינמי רק לריפו ציבורי;
   בריפו אין נתונים ואין מפתחות — AGENTS.md).
 - Settings → Pages → Source: **GitHub Actions**.
 - Settings → Variables (לא Secrets): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` — ערכים ציבוריים.

@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 // Resolve everything from this folder, whatever the current directory is.
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 
-// Served from GitHub Pages at /painting-inspiration/ (DECISIONS 12).
-const BASE = "/painting-inspiration/";
+// Served from GitHub Pages at /art-inspiration/ (DECISIONS 12).
+const BASE = "/art-inspiration/";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ROOT, "");

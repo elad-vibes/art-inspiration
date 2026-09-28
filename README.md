@@ -3,7 +3,7 @@
 אפליקציה (PWA) בעברית לאמא שמציירת לפי תמונות: מוצאים תמונות לציור, שומרים רעיונות באוספים,
 מקבלים הצעות מהמשפחה, ומבקשים יצירה או עריכה של תמונה. מותקנת במסך הבית באייפון.
 
-**כתובת (אחרי הפריסה):** https://elad-vibes.github.io/painting-inspiration/
+**כתובת (אחרי הפריסה):** https://elad-vibes.github.io/art-inspiration/
 
 ## מי עושה מה
 - **אמא** — הגלריה, האוספים, החיפוש, ההצעות מהמשפחה, ויצירה/עריכה בתוך תקרה.
@@ -33,7 +33,7 @@ Storage, Edge Functions (Deno) · GitHub Pages. אפיון: `ART-PLAN.md` · ה�
 ## פיתוח
 ```bash
 npm install
-npm run dev                 # http://localhost:5173/painting-inspiration/
+npm run dev                 # http://localhost:5173/art-inspiration/
 npm test                    # RLS (PGlite) + Edge Functions (מדומות) + יחידה
 npm run check:functions
 npm run scan

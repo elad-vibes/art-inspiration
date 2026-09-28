@@ -68,7 +68,7 @@ export function makeDeps(over: Partial<FakeState> = {}) {
     env: {
       allowedOrigins: [ORIGIN, "http://localhost:5173"],
       requireOrigin: true,
-      appUrl: "https://elad-vibes.github.io/painting-inspiration/",
+      appUrl: "https://elad-vibes.github.io/art-inspiration/",
       cronSecret: CRON_SECRET,
     },
     verifyJwt: async (t) => tokens[t] ?? null,

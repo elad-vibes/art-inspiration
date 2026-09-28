@@ -20,7 +20,7 @@ export function createDeps(): Deps {
     env: {
       allowedOrigins: env("ALLOWED_ORIGINS", "https://elad-vibes.github.io").split(",").map((s) => s.trim()).filter(Boolean),
       requireOrigin: env("REQUIRE_ORIGIN", "true") !== "false",
-      appUrl: env("APP_URL", "https://elad-vibes.github.io/painting-inspiration/"),
+      appUrl: env("APP_URL", "https://elad-vibes.github.io/art-inspiration/"),
       cronSecret: env("CRON_SECRET"),
     },
 
