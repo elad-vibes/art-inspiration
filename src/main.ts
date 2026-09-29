@@ -10,6 +10,7 @@ import { acceptInvite, loadInvite, renderJoin, renderMfaChallenge, renderMfaEnro
 import { loadAdmin, renderAdmin } from "./ui/admin.ts";
 import { isStandalone, ONBOARDED, renderInstall } from "./ui/onboarding.ts";
 import { renderHome, renderMenu } from "./ui/home.ts";
+import { loadAll, watchNetwork } from "./images.ts";
 import { banner } from "./ui/common.ts";
 import { art, markArt } from "./ui/art.ts";
 import { icon } from "./ui/icons.ts";
@@ -87,6 +88,7 @@ async function start() {
   try { onboarded = !!localStorage.getItem(ONBOARDED); } catch { /* private mode */ }
   S.view = !isStandalone() && !onboarded && mobile ? "install" : "app";
   rerender();
+  await loadAll();
 }
 
 async function boot() {
@@ -105,6 +107,7 @@ async function boot() {
   });
   addEventListener("hashchange", () => { onHash(); });
   addEventListener("online", () => { if (S.offline) start(); });
+  watchNetwork();
   registerServiceWorker();
 }
 

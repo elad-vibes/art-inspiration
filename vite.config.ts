@@ -18,13 +18,13 @@ export default defineConfig(({ mode }) => {
   }
   const host = url ? new URL(url).host : "";
 
-  // Image hosts (Supabase Storage, Openverse/Commons thumbnails) are added in the
-  // phase that needs them — never a wildcard.
+  // Images: our own Supabase Storage (signed URLs) only. Web-image hosts
+  // (Openverse/Commons thumbnails) are added in phase 3 — never a wildcard.
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",           // style="" attributes for small layout tweaks
-    "img-src 'self' data: blob:",                  // TOTP QR code, illustrations
+    `img-src 'self' data: blob:${host ? ` https://${host}` : ""}`, // TOTP QR, illustrations, photo preview, Storage
     "font-src 'self'",
     `connect-src 'self'${host ? ` https://${host} wss://${host}` : ""}`,
     "worker-src 'self'",

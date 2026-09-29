@@ -49,6 +49,13 @@ export function dbMessage(e: any): string {
   if (/invite_used/.test(m)) return "ההזמנה כבר שימשה להצטרפות.";
   if (/invite_other_email/.test(m)) return "ההזמנה נשלחה לכתובת מייל אחרת.";
   if (/invite_invalid/.test(m)) return "ההזמנה לא תקינה או שפג תוקפה.";
+  if (/suggestion_pending/.test(m)) return "קודם שומרים את ההצעה, ואז אפשר לשתף אותה.";
+  if (/already_decided/.test(m)) return "כבר החלטת על ההצעה הזאת.";
+  if (/too_many_suggestions/.test(m)) return "נשלחו הרבה תמונות היום. אפשר לשלוח עוד מחר.";
+  if (/too_many_collections/.test(m)) return "יש כבר הרבה אוספים. אפשר למחוק אוסף שלא צריך.";
+  if (/default_collection/.test(m)) return "אי אפשר למחוק את האוסף הראשי.";
+  if (/upload_missing|bad_path/.test(m)) return "ההעלאה לא הושלמה. כדאי לנסות שוב.";
+  if (/mfa_required/.test(m)) return "צריך קודם להזין קוד מאפליקציית האימות.";
   if (/not_found/.test(m)) return "לא נמצא. אולי כבר נמחק.";
   if (/check constraint|violates check/i.test(m)) return "הערך לא תקין (אולי ריק או ארוך מדי).";
   if (/aal2_required|mfa/.test(m)) return "צריך קודם להזין קוד מאפליקציית האימות.";

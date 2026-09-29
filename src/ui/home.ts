@@ -1,12 +1,13 @@
-// The studio home. Phase 1: who you are here and what you may do; the gallery,
-// search and suggestions arrive in the next phases (ART-PLAN §9).
+// The studio home: the painter's gallery, suggestion box and collections, or a
+// family member's side — each by their own permissions (ART-PLAN §1).
 import { attr, html, type SafeHtml, $ } from "../lib/html.ts";
 import { on } from "../lib/events.ts";
 import { dbMessage, sb } from "../lib/supa.ts";
 import { can, flash, isPainter, rerender, S, studio } from "../state.ts";
 import { chooseStudio, saveMyName } from "../data.ts";
 import { permSummary } from "../domain/perms.ts";
-import { art } from "./art.ts";
+import { loadAll } from "../images.ts";
+import { renderFamily, renderPainter } from "./gallery.ts";
 import { icon } from "./icons.ts";
 
 function greeting(): string {
@@ -15,29 +16,13 @@ function greeting(): string {
   return S.myName ? `${t}, ${S.myName}` : t;
 }
 
-const soon = (ic: string, title: string, text: string) =>
-  html`<li class="soon">${icon(ic)}<span class="grow"><b>${title}</b><small>${text}</small></span><span class="chip grey">בקרוב</span></li>`;
-
 export function renderHome(): SafeHtml {
   const s = studio()!;
-  if (isPainter()) {
-    return html`<p class="greet">${greeting()}</p>
-      <div class="card empty">${art.easel()}<h2>הגלריה עוד ריקה</h2>
-        <p class="muted">כאן יופיעו התמונות שתשמרי לציור: מהרשת, מהטלפון ומהמשפחה.</p></div>
-      <div class="card"><h2>מה יהיה כאן</h2><ul class="soonlist">
-        ${soon("search", "חיפוש תמונות לציור", "פרחים, נופים, בעלי חיים — עם שם הצלם והמקור")}
-        ${soon("inbox", "הצעות מהמשפחה", "תמונות שהמשפחה שולחת לך, בתיבה נפרדת")}
-        ${soon("images", "תמונות דומות", "לפי תמונה ששמרת או העלית")}
-        ${soon("sparkles", "תמונות חדשות", "לבקש תמונה, או גרסה אחרת של תמונה — המקור תמיד נשמר")}
-      </ul></div>`;
-  }
-  const who = S.painterName || "הציירת";
+  if (isPainter()) return html`<p class="greet">${greeting()}</p>${renderPainter()}`;
+  const none = !can("send") && !can("view");
   return html`<p class="greet">${greeting()}</p>
-    <div class="card"><h2>ההרשאות שלך</h2><p>${permSummary(s.perms, s.role)}</p></div>
-    ${can("send") ? html`<div class="card empty">${art.letter()}<h2>לשלוח ל${who} תמונה</h2>
-      <p class="muted">בקרוב: שולחים תמונה עם הודעה קצרה, והיא מגיעה לתיבת ההצעות של ${who}.</p></div>` : ""}
-    ${can("view") ? html`<div class="card empty">${art.easel()}<h2>מה ש${who} משתפת</h2>
-      <p class="muted">תמונות ואוספים ש${who} תבחר לשתף עם המשפחה יופיעו כאן${can("comment") ? ", ואפשר יהיה להגיב עליהם" : ""}.</p></div>` : ""}`;
+    ${renderFamily()}
+    <div class="card ${none ? "" : "muted-card"}"><h2>ההרשאות שלך</h2><p>${permSummary(s.perms, s.role)}</p></div>`;
 }
 
 // ---------------------------------------------------------------- the menu
@@ -67,5 +52,6 @@ on("change", "pick-studio", async (el) => {
   await chooseStudio((el as HTMLSelectElement).value);
   S.menu = false;
   rerender();
+  await loadAll();
 });
 on("click", "signout", async () => { await sb.auth.signOut(); location.hash = ""; location.reload(); });

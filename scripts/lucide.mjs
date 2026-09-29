@@ -8,6 +8,7 @@ const NAMES = [
   "menu", "x", "check", "plus", "images", "image-plus", "search", "inbox", "send", "eye", "message-circle",
   "sparkles", "users", "user-round", "palette", "heart", "log-out", "shield-check", "download", "share-2",
   "copy", "trash-2", "wifi-off", "refresh-cw", "link", "settings", "arrow-right", "lock",
+  "thumbs-down", "folder", "folder-plus", "external-link", "pencil",
 ];
 
 const dir = "node_modules/lucide-static";
