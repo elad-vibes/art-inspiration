@@ -32,6 +32,24 @@ export interface CollectionRow {
 
 export interface CommentRow { id: string; author_name: string; mine: boolean; body: string; created_at: string }
 
+/** A row of the painter's "deleted" screen: a hidden web picture, or a small index row of a real delete. */
+export type DeletedOrigin = "web" | "upload" | "suggestion" | "generated";
+export interface DeletedRow {
+  id: string; origin: DeletedOrigin; restorable: boolean; sender_name: string | null;
+  uploaded_at: string; deleted_at: string;
+  thumb_url: string | null; page_url: string | null; creator: string | null; source_name: string | null; attribution: string | null;
+}
+
+/** What the delete-image function answers. */
+export interface DeleteResult { ok: true; mode: "hidden" | "deleted"; cleanup: "none" | "done" | "pending" }
+
+/** Admin: numbers per studio, and the index rows (never a picture, file name or note). */
+export interface StorageOverviewRow {
+  id: string; name: string; image_count: number; file_count: number; bytes_est: number | string;
+  files_no_size: number; deleted_count: number; cleanup_pending: number;
+}
+export interface AdminIndexRow { id: string; origin: Exclude<DeletedOrigin, "web">; sender_name: string; uploaded_at: string; deleted_at: string }
+
 export const MAX_MESSAGE = 300;
 export const MAX_NOTE = 500;
 export const MAX_COMMENT = 500;
@@ -85,6 +103,46 @@ export function countLabel(n: number): string {
   if (n <= 0) return "אין תמונות";
   if (n === 1) return "תמונה אחת";
   return `${n} תמונות`;
+}
+
+/** What the confirmation says BEFORE a delete — plainly what will happen, and whether it can be undone. */
+export interface DeletePrompt { title: string; body: string; confirm: string; final: boolean }
+
+export function deletePrompt(img: { kind: ImageKind; shared?: boolean; sender?: string | null }): DeletePrompt {
+  if (img.kind === "web") {
+    return {
+      title: "להסיר את התמונה מהגלריה?",
+      body: `התמונה תעבור למסך "נמחקו", ואפשר יהיה להחזיר אותה בלחיצה אחת. ההערה והדירוג שלך יישמרו.${img.shared ? " היא תיעלם גם מהמשפחה." : ""}`,
+      confirm: "הסרה מהגלריה",
+      final: false,
+    };
+  }
+  const who = img.sender ? ` ${img.sender} יראה שההצעה הוסרה.` : "";
+  return {
+    title: "למחוק את התמונה לגמרי?",
+    body: `התמונה תימחק מהאחסון, וגם ההערה, הדירוג והתגובות שקשורים אליה. אי אפשר לשחזר אותה.${who}`,
+    confirm: "מחיקה לגמרי",
+    final: true,
+  };
+}
+
+/** One line for a row of the "deleted" screen. */
+export function deletedLabel(origin: DeletedOrigin, sender?: string | null): string {
+  switch (origin) {
+    case "web": return "תמונה מהרשת";
+    case "upload": return "תמונה שהעלית";
+    case "suggestion": return sender ? `הצעה מ${sender}` : "הצעה מהמשפחה";
+    default: return "תמונה שנוצרה";
+  }
+}
+
+/** "3.2 MB" / "480 KB" / "0" — for the admin's estimated storage. */
+export function fmtBytes(n: number | string | null | undefined): string {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return "0";
+  if (v < 1024 * 1024) return `${Math.max(1, Math.round(v / 1024))} KB`;
+  if (v < 1024 ** 3) return `${(v / 1024 ** 2).toFixed(1)} MB`;
+  return `${(v / 1024 ** 3).toFixed(2)} GB`;
 }
 
 /** Trimmed text within a limit, or null when empty. */

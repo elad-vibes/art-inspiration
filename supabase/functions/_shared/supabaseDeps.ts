@@ -10,15 +10,18 @@ function env(name: string, fallback = ""): string {
 export function createDeps(): Deps {
   const url = env("SUPABASE_URL");
   const secret = env("SB_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-  const admin = createClient(url, secret, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  // The publishable (public) key: only used to call functions as the signed-in user.
+  // Set SB_PUBLISHABLE_KEY as a function secret if the platform doesn't provide SUPABASE_ANON_KEY.
+  const publishable = env("SB_PUBLISHABLE_KEY") || env("SUPABASE_ANON_KEY");
+  const noSession = { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false };
+  const admin = createClient(url, secret, { auth: noSession });
 
   return {
     env: {
       allowedOrigins: env("ALLOWED_ORIGINS", "https://elad-vibes.github.io").split(",").map((s) => s.trim()).filter(Boolean),
       requireOrigin: env("REQUIRE_ORIGIN", "true") !== "false",
-      appUrl: env("APP_URL", "https://elad-vibes.github.io/painting-inspiration/"),
+      appUrl: env("APP_URL", "https://elad-vibes.github.io/art-inspiration/"),
+      cronSecret: env("CRON_SECRET"),
     },
 
     async verifyJwt(token: string): Promise<Claims | null> {
@@ -36,6 +39,26 @@ export function createDeps(): Deps {
         throw e;
       }
       return data;
+    },
+
+    async userRpc(token, fn, args) {
+      // a client that carries the caller's own token: the database sees THEM, not the service role
+      const asUser = createClient(url, publishable, { auth: noSession, global: { headers: { Authorization: `Bearer ${token}` } } });
+      const { data, error } = await asUser.rpc(fn, args);
+      if (error) {
+        const e = new Error(`user rpc ${fn} failed`);
+        (e as any).code = error.code;
+        (e as any).pgMessage = error.message;
+        throw e;
+      }
+      return data;
+    },
+
+    storage: {
+      async remove(paths) {
+        const { error } = await admin.storage.from("images").remove(paths);
+        if (error) throw new Error("storage_remove_failed");
+      },
     },
 
     admin: {

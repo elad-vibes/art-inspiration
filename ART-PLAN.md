@@ -110,6 +110,16 @@ Recraft 4.1 $0.035 · Soul Standard ~$0.094. הערכה: 3 אפשרויות ≈ 
 Storage: bucket פרטי `images`, נתיב `{studio}/{owner}/{uuid}.webp`. העלאה רק לתיקייה של המשתמש
 עצמו בסטודיו שהוא חבר בו. קריאה לפי שורה ב-`images` + `can_view_image()`.
 
+**שלב 2ב (0008, בנוי — פירוט ב-DECISIONS 18–20): מחיקה ואינדקס.**
+| מה | תוכן |
+|---|---|
+| `images.deleted_at` | הסתרה של תמונה **מהרשת** בלבד (CHECK: רק `kind = 'web'`). הרשומה נשמרת; שחזור ע"י `restore_image` (ציירת בלבד) |
+| `images.size_bytes` | גודל הקובץ כפי ש-Storage רשם (בשרת, לא מהדפדפן) — לנפח המשוער באדמין |
+| `deleted_index` | מה שנשאר אחרי מחיקה אמיתית: `id`, `studio_id`, `origin` (upload / suggestion / generated), `sender_id` (הצעות בלבד), `uploaded_at`, `deleted_at`. בלי תמונה, תצוגה מוקטנת, הערה, הודעה או שם קובץ. גלוי לציירת של הסטודיו בלבד |
+| `storage_cleanup` | קבצים "ממתינים לניקוי": נתיב, ניסיונות, שגיאה אחרונה. נכתב באותה טרנזקציה של המחיקה; אף לקוח לא קורא או כותב בו. מנוקה ע"י `delete-image` (מיידי) ו-`storage-cleanup` (מתוזמן) |
+
+הפונקציה היחידה שמוחקת: Edge Function `delete-image` → `delete_image` בזהות המשתמש (הבדיקה במסד) → הסרת הקובץ.
+
 ## 8. העברת תמונות מהטלפון
 1. העלאה מספריית התמונות / קבצים (כולם).
 2. אנדרואיד: Web Share Target ב-manifest (POST → service worker → העלאה).

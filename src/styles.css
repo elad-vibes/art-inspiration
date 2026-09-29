@@ -196,3 +196,27 @@ details.help summary{color:var(--accent-deep);font-weight:600}
 .clist li p{overflow-wrap:anywhere}
 .clist li button{min-height:40px;padding:4px 10px}
 textarea{resize:vertical}
+
+/* ---- phase 2b: delete confirmation, the "deleted" screen, admin storage ---- */
+button.solid-danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+@media (prefers-color-scheme:dark){button.solid-danger{background:var(--danger);color:#1B1613}}
+.sheet-bg.cf-bg{z-index:40}
+.sheet.confirm{gap:12px;z-index:41}
+.sheet.confirm h2{color:var(--ink)}
+.sheet.confirm p{color:var(--ink2);font-size:18px}
+.sheet.confirm > .col button.big{justify-content:center}
+.del-row{flex-direction:row;align-items:center;gap:12px;padding:12px}
+.del-pic{flex:none;width:72px;height:72px;border-radius:12px;overflow:hidden;background:var(--surface2)}
+.del-pic img{width:100%;height:100%;object-fit:cover;display:block}
+.del-pic .ph{min-height:0;height:100%;border-radius:0}
+.del-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.del-txt small{color:var(--muted);font-size:15px;overflow-wrap:anywhere}
+.del-txt small.final{color:var(--ink2);font-weight:600}
+.del-row > button{flex:none}
+.del-row.gone{background:var(--surface2);border-style:dashed}
+@media (max-width:420px){.del-row:not(.gone){flex-wrap:wrap}.del-row:not(.gone) .del-txt{flex-basis:calc(100% - 90px)}.del-row:not(.gone) > button{width:100%}}
+.storage-row{display:flex;flex-direction:column;gap:4px;padding:12px 0;border-top:1px solid var(--line)}
+.storage-row:first-of-type{border-top:0}
+.storage-row small{color:var(--muted);font-size:15px}
+.idx-row{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line)}
+.idx-row small{color:var(--muted);font-size:15px}

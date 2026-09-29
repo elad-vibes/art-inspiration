@@ -1,7 +1,7 @@
 # AGENTS.md — הוראות לכל סוכן קוד (Claude / Codex / אחר)
 
 ## מה זה הריפו
-`painting-inspiration` = **הקוד בלבד** של "השראה לציור": PWA לאמא שמציירת לפי תמונות
+`art-inspiration` = **הקוד בלבד** של "השראה לציור": PWA לאמא שמציירת לפי תמונות
 (Vite + TypeScript) עם Supabase משלה (Postgres + RLS, Auth, Storage, Edge Functions).
 האפיון המחייב: `ART-PLAN.md`. החלטות: `DECISIONS.md`. התקדמות: `PROGRESS.md`.
 אין שום קשר ל"הכסף של הבית" — לא קוד משותף, לא מסד נתונים משותף, לא מפתחות משותפים.
